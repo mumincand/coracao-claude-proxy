@@ -1,37 +1,30 @@
-const ALLOWED_ORIGINS = [
-  "https://www.coracaoconfections.com",         
-  "https://coracao-confections-2.myshopify.com" 
-];
+// /api/claude.js  — GEÇİCİ KOLAY ÇÖZÜM (CORS: *)
+// Amaç: preflight'ın geçtiğini kanıtlamak. Çalıştıktan sonra listeye daraltacağız.
 
-function setCors(res, origin) {
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin");
+function setCorsAll(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // geçici!
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
 }
 
 export default async function handler(req, res) {
-  const origin = req.headers.origin || "";
-  const isAllowed = ALLOWED_ORIGINS.includes(origin);
-
-  // Preflight (OPTIONS)
+  // 1) PRELIGHT: Tarayıcı önce hep OPTIONS atar
   if (req.method === "OPTIONS") {
-    setCors(res, origin);
-    return res.status(200).end();
+    setCorsAll(res);
+    return res.status(204).end(); // 204 No Content genelde daha temiz
   }
 
-  if (!isAllowed) {
-    return res.status(403).json({ error: "Forbidden: bad origin", origin });
-  }
-
+  // 2) SADECE POST'A İZİN
   if (req.method !== "POST") {
-    setCors(res, origin);
+    setCorsAll(res);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // 3) ZORUNLU ENV
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
-    setCors(res, origin);
+    setCorsAll(res);
     return res.status(500).json({ error: "Missing ANTHROPIC_API_KEY" });
   }
 
@@ -45,7 +38,7 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      setCors(res, origin);
+      setCorsAll(res);
       return res.status(400).json({ error: "messages array is required" });
     }
 
@@ -61,16 +54,16 @@ export default async function handler(req, res) {
 
     if (!upstream.ok) {
       const detail = await upstream.text();
-      setCors(res, origin);
+      setCorsAll(res);
       return res.status(upstream.status).json({ error: "Anthropic error", detail });
     }
 
     const data = await upstream.json();
-    setCors(res, origin);
+    setCorsAll(res);
     return res.status(200).json(data);
   } catch (e) {
     console.error(e);
-    setCors(res, origin);
+    setCorsAll(res);
     return res.status(500).json({ error: "server_error" });
   }
 }

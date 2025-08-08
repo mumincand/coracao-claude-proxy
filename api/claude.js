@@ -1,16 +1,18 @@
-// /api/claude.js  (Vercel)
-const ALLOWED_STORE = "https://coracao-confections-2.myshopify.com"; 
+const ALLOWED_ORIGINS = [
+  "https://www.coracaoconfections.com",
+  "https://coracao-confections-2.myshopify.com"
+];
 
 function setCors(res, origin) {
   res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Vary", "Origin"); 
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 export default async function handler(req, res) {
   const origin = req.headers.origin || "";
-  const isAllowed = origin === ALLOWED_STORE;
+  const isAllowed = ALLOWED_ORIGINS.includes(origin);
 
   if (req.method === "OPTIONS") {
     if (isAllowed) setCors(res, origin);
@@ -18,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   if (!isAllowed) {
-    return res.status(403).json({ error: "Forbidden: bad origin" });
+    return res.status(403).json({ error: "Forbidden: bad origin", origin });
   }
 
   if (req.method !== "POST") {
@@ -33,13 +35,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const {
-      messages = [],
-      system = "You are a helpful assistant.",
-      model = "claude-3-sonnet-20240229",
-      max_tokens = 800,
-      temperature = 0.7,
-    } = req.body || {};
+    const { messages = [], system, model = "claude-3-sonnet-20240229", max_tokens = 800, temperature = 0.7 } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       setCors(res, origin);
@@ -71,4 +67,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "server_error" });
   }
 }
+
 

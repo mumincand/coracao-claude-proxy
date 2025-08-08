@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
   // Preflight (OPTIONS)
   if (req.method === "OPTIONS") {
-    if (isAllowed) setCors(res, origin);
+    setCors(res, origin);
     return res.status(200).end();
   }
 

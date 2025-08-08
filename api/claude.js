@@ -1,6 +1,6 @@
 const ALLOWED_ORIGINS = [
-  "https://www.coracaoconfections.com",
-  "https://coracao-confections-2.myshopify.com"
+  "https://www.coracaoconfections.com",         
+  "https://coracao-confections-2.myshopify.com" 
 ];
 
 function setCors(res, origin) {
@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   const origin = req.headers.origin || "";
   const isAllowed = ALLOWED_ORIGINS.includes(origin);
 
+  // Preflight (OPTIONS)
   if (req.method === "OPTIONS") {
     if (isAllowed) setCors(res, origin);
     return res.status(200).end();
@@ -35,7 +36,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages = [], system, model = "claude-3-sonnet-20240229", max_tokens = 800, temperature = 0.7 } = req.body || {};
+    const {
+      messages = [],
+      system = "You are a helpful assistant.",
+      model = "claude-3-sonnet-20240229",
+      max_tokens = 800,
+      temperature = 0.7,
+    } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       setCors(res, origin);
@@ -67,5 +74,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "server_error" });
   }
 }
-
-

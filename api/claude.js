@@ -1,15 +1,34 @@
+// /api/claude.js  (Vercel)
+const ALLOWED_STORE = "https://coracao-confections-2.myshopify.com"; 
+
+function setCors(res, origin) {
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin"); 
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 export default async function handler(req, res) {
+  const origin = req.headers.origin || "";
+  const isAllowed = origin === ALLOWED_STORE;
+
   if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (isAllowed) setCors(res, origin);
     return res.status(200).end();
   }
+
+  if (!isAllowed) {
+    return res.status(403).json({ error: "Forbidden: bad origin" });
+  }
+
   if (req.method !== "POST") {
+    setCors(res, origin);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
   if (!ANTHROPIC_API_KEY) {
+    setCors(res, origin);
     return res.status(500).json({ error: "Missing ANTHROPIC_API_KEY" });
   }
 
@@ -23,6 +42,7 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
+      setCors(res, origin);
       return res.status(400).json({ error: "messages array is required" });
     }
 
@@ -38,14 +58,17 @@ export default async function handler(req, res) {
 
     if (!upstream.ok) {
       const detail = await upstream.text();
+      setCors(res, origin);
       return res.status(upstream.status).json({ error: "Anthropic error", detail });
     }
 
-    // App Proxy kullanacağımız için CORS’a ihtiyaç yok, ama burada bırakmak zarar vermez.
     const data = await upstream.json();
+    setCors(res, origin);
     return res.status(200).json(data);
   } catch (e) {
     console.error(e);
+    setCors(res, origin);
     return res.status(500).json({ error: "server_error" });
   }
 }
+

@@ -1,9 +1,6 @@
 // /api/track-order.js
 
-const ALLOWED_ORIGINS = [
-  "https://www.coracaoconfections.com",
-  "https://coracao-confections-2.myshopify.com"
-];
+const ALLOWED_ORIGINS = ["https://coracao-confections-2.myshopify.com"];
 
 function setCors(res, origin) {
   res.setHeader("Access-Control-Allow-Origin", origin);

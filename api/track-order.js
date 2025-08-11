@@ -2,7 +2,7 @@
 
 const ALLOWED_ORIGINS = [
   "https://www.coracaoconfections.com",
-  "https://coracao-confections-2.myshopify.com", // preview gerekiyorsa bırak
+  "https://coracao-confections-2.myshopify.com", // preview gerekiyorsa tut
 ];
 
 function setCors(res, origin) {
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const origin = req.headers.origin || "";
   const isAllowed = ALLOWED_ORIGINS.includes(origin);
 
-  // CORS preflight
+  // Preflight
   if (req.method === "OPTIONS") {
     if (isAllowed) setCors(res, origin);
     return res.status(204).end();
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== "POST") {
-    setCors(res, origin);
+    if (isAllowed) setCors(res, origin);
     return res.status(405).json({ error: "Method not allowed" });
   }
 
@@ -61,10 +61,8 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
     });
-
     let text = await r.text();
-    let data;
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { parseError: text }; }
+    let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { parseError: text }; }
 
     // 2) bulunamazsa sadece email ile çekip name eşle
     if (r.ok && (!data.orders || data.orders.length === 0)) {
@@ -81,48 +79,38 @@ export default async function handler(req, res) {
       if (r2.ok && d2.orders?.length) {
         const normalizedNoHash = normalized.replace(/^#/, "");
         const match = d2.orders.find(o => (o.name || "").replace(/^#/, "") === normalizedNoHash);
-        if (match) {
-          data = { orders: [match] };
-          r = r2;
-        }
+        if (match) data = { orders: [match] };
       }
     }
 
-    if (!r.ok) {
-      setCors(res, origin);
-      return res.status(r.status).json({ error: "Shopify error", detail: data || text });
-    }
+    setCors(res, origin);
 
     if (!data.orders || data.orders.length === 0) {
-      setCors(res, origin);
       return res.status(404).json({ error: "Order not found" });
     }
 
     const order = data.orders[0] || {};
-    const orderName = order.name || normalized; // "#104276"
-    const statusRaw =
-      order.fulfillment_status ||
-      (Array.isArray(order.fulfillments) && order.fulfillments[0]?.status) ||
-      "unfulfilled";
+    const ful = Array.isArray(order.fulfillments) ? order.fulfillments : [];
+    const firstFul = ful[0] || null;
 
-    const isFulfilled = String(statusRaw).toLowerCase() === "fulfilled";
-    const statusUrl = order.order_status_url || null; // ✅ Shopify’nin verdiği doğru link
-    const tracking =
-      (Array.isArray(order.fulfillments) && (order.fulfillments[0]?.tracking_url || order.fulfillments[0]?.tracking_urls?.[0])) ||
-      null;
-
-    // ✨ İSTEDİĞİN MESAJ FORMATI
-    const message = isFulfilled
-      ? `Order ${orderName} was fulfilled.\n\nYou can view your full order details here: ${statusUrl || "https://www.coracaoconfections.com/pages/order-tracking"}\n\nIf you have additional questions about your order, feel free to message us.`
-      : `Order ${orderName} has not been fulfilled yet.\n\nYou can view your full order details here: ${statusUrl || "https://www.coracaoconfections.com/pages/order-tracking"}\n\nIf you have additional questions about your order, feel free to message us.`;
-
-    setCors(res, origin);
+    // YALIN VERİ (frontend’de işleyeceksin)
     return res.status(200).json({
-      message,
-      order_name: orderName.replace(/^#/, ""), // "104276"
-      status: isFulfilled ? "fulfilled" : "unfulfilled",
-      tracking: tracking || "No tracking available",
-      status_url: statusUrl || null
+      order_id: order.id || null,
+      order_name: (order.name || "").replace(/^#/, ""), // "104276"
+      order_name_with_hash: order.name || null,         // "#104276"
+      fulfillment_status: order.fulfillment_status || null, // "fulfilled", "unfulfilled", null
+      order_status_url: order.order_status_url || null,     // ✅ müşteri linki
+      tracking_url: firstFul?.tracking_url || (firstFul?.tracking_urls?.[0] || null),
+      financial_status: order.financial_status || null,
+      processed_at: order.processed_at || order.created_at || null,
+      email: order.email || null,
+      shipping_address: order.shipping_address || null,
+      line_items: Array.isArray(order.line_items) ? order.line_items.map(li => ({
+        title: li.title,
+        quantity: li.quantity,
+        sku: li.sku,
+        fulfillment_status: li.fulfillment_status || null
+      })) : []
     });
 
   } catch (err) {

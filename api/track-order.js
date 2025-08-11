@@ -2,12 +2,12 @@
 
 const ALLOWED_ORIGINS = [
   "https://www.coracaoconfections.com",
-  "https://coracao-confections-2.myshopify.com", // gerekirse preview için
+  "https://coracao-confections-2.myshopify.com", // preview gerekiyorsa bırak
 ];
 
 function setCors(res, origin) {
-  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const origin = req.headers.origin || "";
   const isAllowed = ALLOWED_ORIGINS.includes(origin);
 
-  // Preflight
+  // CORS preflight
   if (req.method === "OPTIONS") {
     if (isAllowed) setCors(res, origin);
     return res.status(204).end();
@@ -44,10 +44,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing order number or email" });
     }
 
-    // Versiyon: doğruladığımız stabil sürüm
     const apiVersion = "2024-10";
-
-    // Shopify'da name genelde "#104349" formatında; # yoksa ekleyelim
     const normalized = orderNumber.toString().startsWith("#")
       ? orderNumber.toString()
       : `#${orderNumber}`;
@@ -69,7 +66,7 @@ export default async function handler(req, res) {
     let data;
     try { data = text ? JSON.parse(text) : {}; } catch { data = { parseError: text }; }
 
-    // 2) bulunamadıysa sadece email ile getirip name eşle
+    // 2) bulunamazsa sadece email ile çekip name eşle
     if (r.ok && (!data.orders || data.orders.length === 0)) {
       const url2 = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${apiVersion}/orders.json?email=${qEmail}&status=any`;
       const r2 = await fetch(url2, {
@@ -93,7 +90,6 @@ export default async function handler(req, res) {
 
     if (!r.ok) {
       setCors(res, origin);
-      // "Not Found" genelde versiyon/domain/token mismatch demektir; senin case'inde versiyonu düzelttik.
       return res.status(r.status).json({ error: "Shopify error", detail: data || text });
     }
 
@@ -103,15 +99,30 @@ export default async function handler(req, res) {
     }
 
     const order = data.orders[0] || {};
-    const f = Array.isArray(order.fulfillments) && order.fulfillments[0];
-    const status = order.fulfillment_status || (f?.status || "unfulfilled");
-    const tracking = f?.tracking_url || (f?.tracking_urls?.[0]) || "No tracking available";
+    const orderName = order.name || normalized; // "#104276"
+    const statusRaw =
+      order.fulfillment_status ||
+      (Array.isArray(order.fulfillments) && order.fulfillments[0]?.status) ||
+      "unfulfilled";
+
+    const isFulfilled = String(statusRaw).toLowerCase() === "fulfilled";
+    const statusUrl = order.order_status_url || null; // ✅ Shopify’nin verdiği doğru link
+    const tracking =
+      (Array.isArray(order.fulfillments) && (order.fulfillments[0]?.tracking_url || order.fulfillments[0]?.tracking_urls?.[0])) ||
+      null;
+
+    // ✨ İSTEDİĞİN MESAJ FORMATI
+    const message = isFulfilled
+      ? `Order ${orderName} was fulfilled.\n\nYou can view your full order details here: ${statusUrl || "https://www.coracaoconfections.com/pages/order-tracking"}\n\nIf you have additional questions about your order, feel free to message us.`
+      : `Order ${orderName} has not been fulfilled yet.\n\nYou can view your full order details here: ${statusUrl || "https://www.coracaoconfections.com/pages/order-tracking"}\n\nIf you have additional questions about your order, feel free to message us.`;
 
     setCors(res, origin);
     return res.status(200).json({
-      order_name: order.name || null,
-      status: status || "unknown",
-      tracking,
+      message,
+      order_name: orderName.replace(/^#/, ""), // "104276"
+      status: isFulfilled ? "fulfilled" : "unfulfilled",
+      tracking: tracking || "No tracking available",
+      status_url: statusUrl || null
     });
 
   } catch (err) {

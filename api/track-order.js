@@ -1,8 +1,8 @@
-// /api/track-order.js
+
 
 const ALLOWED_ORIGINS = [
   "https://www.coracaoconfections.com",
-  "https://coracao-confections-2.myshopify.com", // preview gerekiyorsa tut
+  "https://coracao-confections-2.myshopify.com",
 ];
 
 function setCors(res, origin) {
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const origin = req.headers.origin || "";
   const isAllowed = ALLOWED_ORIGINS.includes(origin);
 
-  // Preflight
+
   if (req.method === "OPTIONS") {
     if (isAllowed) setCors(res, origin);
     return res.status(204).end();
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     const qName = encodeURIComponent(normalized);
     const qEmail = encodeURIComponent(email.trim());
 
-    // 1) name + email ile dene
+   
     const url = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${apiVersion}/orders.json?name=${qName}&email=${qEmail}&status=any`;
     let r = await fetch(url, {
       headers: {
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
     let text = await r.text();
     let data; try { data = text ? JSON.parse(text) : {}; } catch { data = { parseError: text }; }
 
-    // 2) bulunamazsa sadece email ile çekip name eşle
+    
     if (r.ok && (!data.orders || data.orders.length === 0)) {
       const url2 = `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${apiVersion}/orders.json?email=${qEmail}&status=any`;
       const r2 = await fetch(url2, {
@@ -93,13 +93,13 @@ export default async function handler(req, res) {
     const ful = Array.isArray(order.fulfillments) ? order.fulfillments : [];
     const firstFul = ful[0] || null;
 
-    // YALIN VERİ (frontend’de işleyeceksin)
+    
     return res.status(200).json({
       order_id: order.id || null,
-      order_name: (order.name || "").replace(/^#/, ""), // "104276"
-      order_name_with_hash: order.name || null,         // "#104276"
-      fulfillment_status: order.fulfillment_status || null, // "fulfilled", "unfulfilled", null
-      order_status_url: order.order_status_url || null,     // ✅ müşteri linki
+      order_name: (order.name || "").replace(/^#/, ""), 
+      order_name_with_hash: order.name || null,         
+      fulfillment_status: order.fulfillment_status || null, 
+      order_status_url: order.order_status_url || null,     
       tracking_url: firstFul?.tracking_url || (firstFul?.tracking_urls?.[0] || null),
       financial_status: order.financial_status || null,
       processed_at: order.processed_at || order.created_at || null,

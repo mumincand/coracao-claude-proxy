@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const {
       messages = [],
       system = "You are a helpful assistant.",
-      model = "claude-3-7-sonnet-20241022",
+      model = "claude-3-7-sonnet-20250219",
       max_tokens = 800,
       temperature = 0.7,
     } = req.body || {};
